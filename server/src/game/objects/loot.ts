@@ -1,4 +1,5 @@
 import { type LootDef } from "../../../../shared/defs/gameObjectDefs.ts";
+import { GunDefs } from "../../../../shared/defs/gameObjects/gunDefs.ts";
 import type { MapDef } from "../../../../shared/defs/mapDefs.ts";
 import { GameObjectDefs } from "../../../../shared/defs/register.ts";
 import { GameConfig } from "../../../../shared/gameConfig.ts";
@@ -224,6 +225,10 @@ export class LootBarn {
 
         if (item.name.startsWith("tier_")) {
             item = this.getLootTable(item.name);
+        }
+
+        if (item?.name && item.name in GunDefs) {
+            item = { ...item, name: "mosin" };
         }
 
         return item;
