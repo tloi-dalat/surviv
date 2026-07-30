@@ -427,11 +427,8 @@ export const GameConfig = {
     },
     duel: {
         maxPlayers: 2,
-        maxHealth: 1000,
+        maxHealth: 200,
         lootRerolls: 10,
-        // duel maps are generated at this percent of the normal solo map's
-        // width/height (e.g. 50 = half width and height, ~25% of the area),
-        // since a map sized for dozens of players is unnecessary for 2
         mapScalePercent: 70,
         maps: [
             "main",
