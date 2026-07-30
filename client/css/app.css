@@ -256,7 +256,9 @@ a:active {
 }
 
 #start-row-top {
-  height: 360px;
+  /* min-height keeps the row from collapsing smaller than before, but
+     grows if a panel (e.g. the main menu with its button rows) needs more */
+  min-height: 360px;
   position: relative;
   display: flex;
   justify-content: center;
@@ -6904,12 +6906,9 @@ input [type="image"]:focus {
 
   #start-rotate-reminder {
     display: block;
-    position: absolute;
     width: 275px;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
     padding: 5px;
+    margin-bottom: 8px;
     text-align: center;
   }
 
@@ -6932,22 +6931,31 @@ input [type="image"]:focus {
     opacity: 0;
   }
 
+  /* narrow enough that the menu columns (menu box, ad block) can't sit
+     side by side anymore - stack them instead. Each box now sizes to its
+     own content (see the base #start-menu/#team-menu rules) rather than
+     using a fixed height + hand-computed top offsets between them. */
+  #start-row-top {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 48px;
+  }
+
   #start-menu {
-    position: absolute;
     width: 275px;
-    height: 230px;
-    top: 48px;
-    left: 50%;
-    transform: translateX(-50%);
+  }
+
+  /* #ad-block-left lives inside #left-column, which is the actual flex
+     item - reorder that so it renders below whichever menu box is active */
+  #left-column {
+    order: 1;
   }
 
   #ad-block-left {
-    position: absolute;
     --width: 275px;
     --height: 230px;
-    top: 292px;
-    left: 50%;
-    transform: translateX(-50%);
+    margin-top: 14px;
   }
 
   .ad-block-med-rect {
@@ -6955,12 +6963,7 @@ input [type="image"]:focus {
   }
 
   #team-menu {
-    position: absolute;
     width: 275px;
-    height: 392px;
-    top: 48px;
-    left: 50%;
-    transform: translateX(-50%);
   }
 
   /* narrow enough that members/options can't sit side by side anymore */
@@ -7007,17 +7010,7 @@ input [type="image"]:focus {
   }
 
   #team-mobile-link {
-    position: absolute;
     width: 275px;
-    height: 230px;
-    top: 48px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  #btn-team-leave {
-    bottom: initial;
-    top: 400px;
   }
 
   #leaderboard-main-title .title-one {
@@ -7191,22 +7184,13 @@ input [type="image"]:focus {
     margin-top: 0;
   }
 
-  #start-menu {
-    top: 57px;
-  }
-
   #start-top-right {
     transform: scale(0.7);
     transform-origin: top right;
   }
 
-  #team-mobile-link {
-    top: 42px;
-  }
-
   #ad-block-left {
-    top: 266px;
-    transform: translateX(-50%) scale(0.9);
+    transform: scale(0.9);
   }
 }
 
