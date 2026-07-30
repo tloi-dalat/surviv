@@ -628,21 +628,27 @@ export class Player extends BaseGameObject {
      */
     playerStatusDirty = false;
 
-    private _health: number = GameConfig.player.health;
+    private _health: number = this.game.duelMode
+        ? GameConfig.duel.maxHealth
+        : GameConfig.player.health;
+
+    get maxHealth(): number {
+        return this.game.duelMode ? GameConfig.duel.maxHealth : GameConfig.player.health;
+    }
 
     get health(): number {
         return this._health;
     }
 
     set health(health: number) {
-        health = math.clamp(health, 0, GameConfig.player.health);
+        health = math.clamp(health, 0, this.maxHealth);
         if (this._health === health) return;
         this._health = health;
         this.healthDirty = true;
         this.setGroupStatuses();
 
         if (this.obstacleOutfit) {
-            const healthT = math.clamp(this._health / 100, 0, 1);
+            const healthT = math.clamp(this._health / this.maxHealth, 0, 1);
 
             if (!math.eqAbs(this.obstacleOutfit.healthT, healthT, 0.01)) {
                 this.obstacleOutfit.healthT = healthT;
@@ -2390,7 +2396,7 @@ export class Player extends BaseGameObject {
                     if (healAmount > 0) {
                         this.health = math.min(
                             this.health + healAmount,
-                            GameConfig.player.health,
+                            this.maxHealth,
                         );
                         this.healEffectTicker = 0.5;
                         this.setDirty();

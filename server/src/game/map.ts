@@ -276,8 +276,19 @@ export class GameMap {
         const scale = (this.scale = game.teamMode > TeamMode.Duo ? "large" : "small");
 
         const mapConfig = mapDef.mapGen.map;
-        this.width = mapConfig.baseWidth * mapConfig.scale[scale] + mapConfig.extension;
-        this.height = mapConfig.baseHeight * mapConfig.scale[scale] + mapConfig.extension;
+        let width = mapConfig.baseWidth * mapConfig.scale[scale] + mapConfig.extension;
+        let height = mapConfig.baseHeight * mapConfig.scale[scale] + mapConfig.extension;
+
+        // duels only ever have 2 players, so shrink the map so they find
+        // each other faster instead of wandering a map sized for dozens
+        if (game.duelMode) {
+            const duelScale = GameConfig.duel.mapScalePercent / 100;
+            width *= duelScale;
+            height *= duelScale;
+        }
+
+        this.width = width;
+        this.height = height;
 
         this.bounds = collider.createAabb(
             v2.create(0, 0),

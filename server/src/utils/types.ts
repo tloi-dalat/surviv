@@ -30,6 +30,7 @@ export interface SaveGameBody {
 export interface ServerGameConfig {
     readonly mapName: MapDefKey;
     readonly teamMode: TeamMode;
+    readonly duelMode?: boolean;
 }
 
 export const zFindGamePrivateBody = z.object({
@@ -38,6 +39,7 @@ export const zFindGamePrivateBody = z.object({
     autoFill: z.boolean(),
     mapName: z.string(),
     teamMode: z.number(),
+    duelMode: z.boolean().optional(),
     playerData: z.array(
         z.object({
             token: z.string(),

@@ -8,9 +8,9 @@ import {
     type ObjectType,
 } from "./objectSerializeFns.ts";
 
-function serializeActivePlayer(s: BitStream, data: LocalDataWithDirty) {
+function serializeActivePlayer(s: BitStream, data: LocalDataWithDirty, maxHealth: number) {
     s.writeBoolean(data.healthDirty);
-    if (data.healthDirty) s.writeFloat(data.health, 0, 100, 8);
+    if (data.healthDirty) s.writeFloat(data.health, 0, maxHealth, 8);
 
     s.writeBoolean(data.boostDirty);
     if (data.boostDirty) s.writeFloat(data.boost, 0, 100, 8);
@@ -52,10 +52,10 @@ function serializeActivePlayer(s: BitStream, data: LocalDataWithDirty) {
     s.writeAlignToNextByte();
 }
 
-function deserializeActivePlayer(s: BitStream, data: LocalDataWithDirty) {
+function deserializeActivePlayer(s: BitStream, data: LocalDataWithDirty, maxHealth: number) {
     data.healthDirty = s.readBoolean();
     if (data.healthDirty) {
-        data.health = s.readFloat(0, 100, 8);
+        data.health = s.readFloat(0, maxHealth, 8);
     }
     data.boostDirty = s.readBoolean();
     if (data.boostDirty) {
@@ -246,6 +246,10 @@ export const UpdateExtFlags = {
 };
 
 export class UpdateMsg implements AbstractMsg {
+    // set by the caller before serialize()/deserialize() when the active
+    // player's max health differs from the default (e.g. duel mode)
+    maxHealth: number = GameConfig.player.health;
+
     delObjIds: number[] = [];
     fullObjects: Array<
         & ObjectsFullData[ObjectType]
@@ -328,7 +332,7 @@ export class UpdateMsg implements AbstractMsg {
             flags |= UpdateExtFlags.ActivePlayerId;
         }
 
-        serializeActivePlayer(s, this.activePlayerData);
+        serializeActivePlayer(s, this.activePlayerData, this.maxHealth);
 
         if (this.gasDirty) {
             serializeGasData(s, this.gasData);
@@ -545,7 +549,7 @@ export class UpdateMsg implements AbstractMsg {
         }
 
         const activePlayerData = {} as LocalDataWithDirty;
-        deserializeActivePlayer(s, activePlayerData);
+        deserializeActivePlayer(s, activePlayerData, this.maxHealth);
         this.activePlayerData = activePlayerData;
 
         if ((flags & UpdateExtFlags.Gas) != 0) {

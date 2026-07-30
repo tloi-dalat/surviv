@@ -105,6 +105,7 @@ class ServerGame extends Game {
             id: this.id,
             teamMode: this.teamMode,
             mapName: this.mapName,
+            duelMode: this.duelMode,
             canJoin: this.canJoin,
             aliveCount: this.aliveCount,
             startedTime: this.startedTime,

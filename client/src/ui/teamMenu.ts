@@ -1,4 +1,5 @@
 import $ from "jquery";
+import { type MapDefKey, MapDefs } from "../../../shared/defs/mapDefs.ts";
 import { GameConfig } from "../../../shared/gameConfig.ts";
 import * as net from "../../../shared/net/net.ts";
 import type { FindGameMatchData } from "../../../shared/types/api.ts";
@@ -22,8 +23,11 @@ import type { Localization } from "./localization.ts";
 
 function errorTypeToString(type: TeamMenuErrorType, localization: Localization) {
     const typeMap = {
-        join_full: localization.translate("index-team-is-full"),
+        // any reason a join can fail (full, not found, wrong mode) just
+        // shows the same generic message
+        join_full: localization.translate("index-failed-joining-team"),
         join_not_found: localization.translate("index-failed-joining-team"),
+        join_wrong_mode: localization.translate("index-failed-joining-team"),
         create_failed: localization.translate("index-failed-creating-team"),
         join_failed: localization.translate("index-failed-joining-team"),
         join_game_failed: localization.translate("index-failed-joining-game"),
@@ -48,15 +52,23 @@ export class TeamMenu {
     );
 
     serverSelect = $("#team-server-select");
+    modeRow = $("#team-mode-row");
     queueMode1 = $("#btn-team-queue-mode-1");
     queueMode2 = $("#btn-team-queue-mode-2");
+    fillRow = $("#team-fill-row");
     fillAuto = $("#btn-team-fill-auto");
     fillNone = $("#btn-team-fill-none");
+    duelMapRow = $("#team-duel-map-row");
+    duelMapSelect = $("#team-duel-map-select");
 
     active = false;
     joined = false;
     create = false;
     joiningGame = false;
+    // undefined = joining via a raw shared link, where we don't know ahead
+    // of time whether it points to a duel or team room - only "Join Duel"/
+    // "Join Team" set this explicitly, which the server then enforces
+    joinDuelIntent: boolean | undefined = undefined;
     ws: WebSocket | null = null;
     keepAliveTimeout = 0;
 
@@ -106,6 +118,18 @@ export class TeamMenu {
         });
         this.fillNone.on("click", () => {
             this.setRoomProperty("autoFill", false);
+        });
+        for (const mapName of GameConfig.duel.maps) {
+            this.duelMapSelect.append(
+                $("<option/>", {
+                    value: mapName,
+                    text: MapDefs[mapName as MapDefKey]?.desc.name ?? mapName,
+                }),
+            );
+        }
+        this.duelMapSelect.on("change", () => {
+            const mapName = this.duelMapSelect.val() as string;
+            this.setRoomProperty("duelMapName", mapName);
         });
         this.playBtn.on("click", () => {
             SDK.requestMidGameAd(() => {
@@ -179,7 +203,7 @@ export class TeamMenu {
         });
     }
 
-    connect(create: boolean, roomUrl: string) {
+    connect(create: boolean, roomUrl: string, duelMode?: boolean) {
         if (!this.active || roomUrl !== this.roomData.roomUrl) {
             const roomHost = api.resolveRoomHost();
             const url = `w${window.location.protocol === "https:" ? "ss" : "s"}://${roomHost}/team_v2`;
@@ -189,6 +213,10 @@ export class TeamMenu {
             this.joiningGame = false;
             this.editingName = false;
             this.gameError = undefined;
+            // keep the raw (possibly undefined) intent for the join message;
+            // undefined means "joining a raw link, accept whichever mode the
+            // room actually is" - only used when !create, see onopen below
+            this.joinDuelIntent = duelMode;
 
             // Load properties from config
             this.playerData = {
@@ -198,9 +226,11 @@ export class TeamMenu {
                 roomUrl,
                 region: this.config.get("region")!,
                 gameModeIdx: this.config.get("gameModeIdx")!,
-                autoFill: this.config.get("teamAutoFill")!,
+                autoFill: duelMode ? false : this.config.get("teamAutoFill")!,
                 findingGame: false,
                 lastError: undefined,
+                duelMode: !!duelMode,
+                duelMapName: GameConfig.duel.maps[0],
             } as RoomData;
             this.displayedInvalidProtocolModal = false;
 
@@ -237,6 +267,7 @@ export class TeamMenu {
                     } else {
                         this.sendMessage("join", {
                             roomUrl: this.roomData.roomUrl,
+                            duelMode: this.joinDuelIntent,
                             playerData: this.playerData,
                         });
                     }
@@ -453,21 +484,36 @@ export class TeamMenu {
                 ele.selected = ele.value == this.roomData.region;
             });
 
-            // Modes btns
-            setButtonState(
-                this.queueMode1,
-                this.roomData.gameModeIdx == 1,
-                this.isLeader && this.roomData.enabledGameModeIdxs.includes(1),
-            );
-            setButtonState(
-                this.queueMode2,
-                this.roomData.gameModeIdx == 2,
-                this.isLeader && this.roomData.enabledGameModeIdxs.includes(2),
-            );
+            // Modes btns - duel rooms are always Solo/1v1, so the
+            // Duo/Squad and Auto Fill/No Fill choices don't apply.
+            // #team-menu-columns is a flex row now, so hiding these just
+            // shrinks the options column naturally - no fixed height to fix up.
+            this.modeRow.css("display", this.roomData.duelMode ? "none" : "flex");
+            this.fillRow.css("display", this.roomData.duelMode ? "none" : "flex");
+            if (!this.roomData.duelMode) {
+                setButtonState(
+                    this.queueMode1,
+                    this.roomData.gameModeIdx == 1,
+                    this.isLeader && this.roomData.enabledGameModeIdxs.includes(1),
+                );
+                setButtonState(
+                    this.queueMode2,
+                    this.roomData.gameModeIdx == 2,
+                    this.isLeader && this.roomData.enabledGameModeIdxs.includes(2),
+                );
+                setButtonState(this.fillAuto, this.roomData.autoFill, this.isLeader);
+                setButtonState(this.fillNone, !this.roomData.autoFill, this.isLeader);
+            }
 
-            // Fill mode
-            setButtonState(this.fillAuto, this.roomData.autoFill, this.isLeader);
-            setButtonState(this.fillNone, !this.roomData.autoFill, this.isLeader);
+            // Duel mode
+            this.duelMapRow.css("display", this.roomData.duelMode ? "block" : "none");
+            this.duelMapSelect.prop("disabled", !this.isLeader);
+            if (this.roomData.duelMapName) {
+                this.duelMapSelect.find("option").each((_idx, ele) => {
+                    ele.selected = ele.value == this.roomData.duelMapName;
+                });
+            }
+
             this.serverSelect.prop("disabled", !this.isLeader);
 
             // Invite link
@@ -526,18 +572,35 @@ export class TeamMenu {
 
             const waitReason = $("#msg-wait-reason");
 
-            if (this.isLeader) {
-                waitReason.html(
-                    `${
-                        this.localization.translate(
-                            "index-game-in-progress",
-                        )
-                    }<span> ...</span>`,
-                );
+            // duels can't start until the second player has joined - the
+            // leader sees a wait message instead of the Play button
+            const needsDuelOpponent =
+                this.roomData.duelMode && this.players.length < GameConfig.duel.maxPlayers;
 
-                const showWaitMessage = playersInGame && !this.joiningGame;
-                waitReason.css("display", showWaitMessage ? "block" : "none");
-                this.playBtn.css("display", showWaitMessage ? "none" : "block");
+            if (this.isLeader) {
+                if (needsDuelOpponent && !playersInGame) {
+                    waitReason.html(
+                        `${
+                            this.localization.translate(
+                                "index-waiting-for-opponent",
+                            )
+                        }<span> ...</span>`,
+                    );
+                    waitReason.css("display", this.joiningGame ? "none" : "block");
+                    this.playBtn.css("display", "none");
+                } else {
+                    waitReason.html(
+                        `${
+                            this.localization.translate(
+                                "index-game-in-progress",
+                            )
+                        }<span> ...</span>`,
+                    );
+
+                    const showWaitMessage = playersInGame && !this.joiningGame;
+                    waitReason.css("display", showWaitMessage ? "block" : "none");
+                    this.playBtn.css("display", showWaitMessage ? "none" : "block");
+                }
             } else {
                 if (this.roomData.findingGame || this.joiningGame) {
                     waitReason.html(

@@ -6,6 +6,7 @@ import type { FindGameMatchData } from "./api.ts";
 export type TeamMenuErrorType =
     | "join_full"
     | "join_not_found"
+    | "join_wrong_mode"
     | "join_failed"
     | "create_failed"
     | "lost_conn"
@@ -29,6 +30,8 @@ export interface RoomData {
     gameModeIdx: number;
     maxPlayers: number;
     captchaEnabled: boolean;
+    duelMode: boolean;
+    duelMapName: string;
 }
 
 //
@@ -95,6 +98,8 @@ export const zClientRoomData = z.object({
     region: z.string(),
     autoFill: z.boolean(),
     gameModeIdx: z.number(),
+    duelMode: z.boolean().optional(),
+    duelMapName: z.string().optional(),
 });
 
 export type ClientRoomData = z.infer<typeof zClientRoomData>;
@@ -109,6 +114,7 @@ export const zTeamJoinMsg = z.object({
     type: z.literal("join"),
     data: z.object({
         roomUrl: z.string(),
+        duelMode: z.boolean().optional(),
         playerData: z.object({
             name: z.string(),
         }),

@@ -2,7 +2,7 @@ import { type ChildProcess, fork } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { WebSocket } from "uWebSockets.js";
 import { type MapDefKey, MapDefs } from "../../../shared/defs/mapDefs.ts";
-import type { TeamMode } from "../../../shared/gameConfig.ts";
+import { GameConfig, type TeamMode } from "../../../shared/gameConfig.ts";
 import type { GameWsDisconnectReason } from "../../../shared/types/api.ts";
 import { util } from "../../../shared/utils/util.ts";
 import { ServerLogger } from "../utils/logger.ts";
@@ -33,6 +33,7 @@ class GameProcess {
         id: "",
         teamMode: 0 as TeamMode,
         mapName: "",
+        duelMode: false,
         canJoin: false,
         aliveCount: 0,
         startedTime: 0,
@@ -133,11 +134,14 @@ class GameProcess {
         this.gameData.id = id;
         this.gameData.teamMode = config.teamMode;
         this.gameData.mapName = config.mapName;
+        this.gameData.duelMode = !!config.duelMode;
         this.gameData.stopped = false;
         this.state = ProcState.CreatingGame;
 
         const mapDef = MapDefs[this.gameData.mapName as MapDefKey];
-        this.avaliableSlots = mapDef.gameMode.maxPlayers;
+        this.avaliableSlots = config.duelMode
+            ? GameConfig.duel.maxPlayers
+            : mapDef.gameMode.maxPlayers;
 
         this.reusedCount++;
     }
@@ -322,6 +326,7 @@ export class GameProcessManager {
                     && proc.avaliableSlots > 0
                     && game.teamMode === body.teamMode
                     && game.mapName === body.mapName
+                    && game.duelMode === !!body.duelMode
                 );
             })
             .sort((a, b) => {
@@ -332,6 +337,7 @@ export class GameProcessManager {
             proc = this.newGame({
                 teamMode: body.teamMode,
                 mapName: body.mapName as MapDefKey,
+                duelMode: body.duelMode,
             });
         }
 

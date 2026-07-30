@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import { randomUUID } from "node:crypto";
+import { GameConfig, TeamMode } from "../../shared/gameConfig.ts";
 import type { FindGamePrivateError } from "../../shared/types/api.ts";
 import {
     type ClientRoomData,
@@ -108,6 +109,8 @@ class Room {
         gameModeIdx: 1,
         maxPlayers: 4,
         captchaEnabled: false,
+        duelMode: false,
+        duelMapName: GameConfig.duel.maps[0],
     };
 
     constructor(
@@ -177,20 +180,34 @@ class Room {
         }
         this.data.region = region;
 
-        let gameModeIdx = props.gameModeIdx;
+        // duel rooms bypass the public gameModeIdx list entirely: the host
+        // picks a map directly from the allowed duel biome list instead
+        this.data.duelMode = !!props.duelMode;
 
-        const modes = this.teamMenu.server.modes;
+        if (this.data.duelMode) {
+            const duelMaps: readonly string[] = GameConfig.duel.maps;
+            this.data.duelMapName = duelMaps.includes(props.duelMapName ?? "")
+                ? props.duelMapName!
+                : duelMaps[0];
 
-        if (!this.data.enabledGameModeIdxs.includes(gameModeIdx)) {
-            // we don't allow creating teams if there's no valid team mode
-            // so this will never be -1
-            gameModeIdx = modes.findIndex((mode) => mode.enabled && mode.teamMode > 1);
+            this.data.maxPlayers = GameConfig.duel.maxPlayers;
+            this.data.autoFill = false;
+        } else {
+            let gameModeIdx = props.gameModeIdx;
+
+            const modes = this.teamMenu.server.modes;
+
+            if (!this.data.enabledGameModeIdxs.includes(gameModeIdx)) {
+                // we don't allow creating teams if there's no valid team mode
+                // so this will never be -1
+                gameModeIdx = modes.findIndex((mode) => mode.enabled && mode.teamMode > 1);
+            }
+
+            this.data.gameModeIdx = gameModeIdx;
+
+            this.data.maxPlayers = modes[gameModeIdx].teamMode;
+            this.data.autoFill = props.autoFill;
         }
-
-        this.data.gameModeIdx = gameModeIdx;
-
-        this.data.maxPlayers = modes[gameModeIdx].teamMode;
-        this.data.autoFill = props.autoFill;
 
         // kick players that don't fit on the new max players
         while (this.players.length > this.data.maxPlayers) {
@@ -231,6 +248,10 @@ class Room {
         if (this.players.some((p) => p.inGame)) return;
         const roomLeader = this.players[0];
         if (!roomLeader) return;
+        // duel rooms can't start solo - wait for the second player to join
+        if (this.data.duelMode && this.players.length < GameConfig.duel.maxPlayers) {
+            return;
+        }
 
         this.data.findingGame = true;
         this.sendState();
@@ -255,9 +276,19 @@ class Room {
             }),
         );
 
-        const mode = this.teamMenu.server.modes[this.data.gameModeIdx];
-        if (!mode || !mode.enabled) {
-            return;
+        let mapName: string;
+        let teamMode: TeamMode;
+
+        if (this.data.duelMode) {
+            mapName = this.data.duelMapName;
+            teamMode = TeamMode.Solo;
+        } else {
+            const mode = this.teamMenu.server.modes[this.data.gameModeIdx];
+            if (!mode || !mode.enabled) {
+                return;
+            }
+            mapName = mode.mapName;
+            teamMode = mode.teamMode;
         }
 
         if (this.data.captchaEnabled) {
@@ -282,8 +313,9 @@ class Room {
         }
 
         const res = await this.teamMenu.server.findGame({
-            mapName: mode.mapName,
-            teamMode: mode.teamMode,
+            mapName,
+            teamMode,
+            duelMode: this.data.duelMode,
             autoFill: this.data.autoFill,
             region: region,
             version: data.version,
@@ -539,7 +571,8 @@ export class TeamMenu {
             switch (msg.type) {
                 case "create": {
                     // don't allow creating a team if there's no team mode enabled
-                    if (!this.allowedGameModeIdxs().length) {
+                    // (duel rooms bypass the team mode list entirely, so they're always allowed)
+                    if (!msg.data.roomData.duelMode && !this.allowedGameModeIdxs().length) {
                         player.send("error", { type: "create_failed" });
                         break;
                     }
@@ -555,6 +588,18 @@ export class TeamMenu {
                     const room = this.rooms.get(msg.data.roomUrl);
                     if (!room) {
                         player.send("error", { type: "join_not_found" });
+                        break;
+                    }
+
+                    // Join Duel can only join duel rooms and Join Team can
+                    // only join team rooms - never mix the two. Raw/shared
+                    // links send no explicit intent (undefined), so they're
+                    // allowed to join whichever mode the room actually is.
+                    if (
+                        msg.data.duelMode !== undefined &&
+                        room.data.duelMode !== msg.data.duelMode
+                    ) {
+                        player.send("error", { type: "join_wrong_mode" });
                         break;
                     }
 

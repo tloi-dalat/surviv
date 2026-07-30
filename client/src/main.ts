@@ -28,7 +28,7 @@ import { SDK } from "./sdk/sdk.ts";
 import { SiteInfo } from "./siteInfo.ts";
 import { LoadoutMenu } from "./ui/loadoutMenu.ts";
 import { Localization } from "./ui/localization.ts";
-import Menu from "./ui/menu.ts";
+import Menu, { joinIntent } from "./ui/menu.ts";
 import { MenuModal } from "./ui/menuModal.ts";
 import { LoadoutDisplay } from "./ui/opponentDisplay.ts";
 import { Pass } from "./ui/pass.ts";
@@ -243,6 +243,9 @@ export class Application {
             $("#btn-create-team").on("click", () => {
                 this.tryJoinTeam(true);
             });
+            $("#btn-create-duel").on("click", () => {
+                this.tryJoinTeam(true, undefined, true);
+            });
             $("#btn-team-mobile-link-join").on("click", () => {
                 let t = $<HTMLInputElement>("#team-link-input").val()!.trim()!;
                 const r = t.indexOf("#");
@@ -251,7 +254,7 @@ export class Application {
                 }
                 if (t.length > 0) {
                     $("#team-mobile-link").css("display", "none");
-                    this.tryJoinTeam(false, t);
+                    this.tryJoinTeam(false, t, joinIntent.duel);
                 } else {
                     $("#team-mobile-link-desc").css("display", "none");
                     $("#team-mobile-link-warning").css("display", "none").fadeIn(100);
@@ -485,6 +488,14 @@ export class Application {
             window.history.replaceState("", "", "/");
         }
 
+        // openJoinPanel() (menu.ts) hides #news-block when the Join Team/
+        // Join Duel code entry panel is opened. The "Back to Main Menu" and
+        // "Leave Team" buttons restore it manually, but this callback fires
+        // for every other way a room is left (join failed, kicked, lost
+        // connection, game join failed, etc.) - restore it here too so the
+        // news panel doesn't stay hidden after those.
+        $("#news-block").css("display", "block");
+
         this.errorMessage = errTxt || "";
         this.setDOMFromConfig();
         this.refreshUi();
@@ -618,7 +629,7 @@ export class Application {
         }
     }
 
-    tryJoinTeam(create: boolean, url?: string) {
+    tryJoinTeam(create: boolean, url?: string, duelMode?: boolean) {
         if (this.active && this.quickPlayPendingModeIdx === -1) {
             // Join team if the url contains a team address
             let roomUrl = url || window.location.hash.slice(1);
@@ -635,7 +646,7 @@ export class Application {
                 // selected region. We will stash the menu values
                 // into the config so the team menu can read them.
                 this.setConfigFromDOM();
-                this.teamMenu.connect(create, roomUrl);
+                this.teamMenu.connect(create, roomUrl, duelMode);
                 this.refreshUi();
             }
         }

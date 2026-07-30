@@ -852,6 +852,10 @@
                   <a class="btn-darken menu-option btn-team-option" id="btn-join-team" data-l10n="index-join-team">Join Team</a>
                   <a class="btn-darken menu-option btn-team-option" id="btn-create-team" data-l10n="index-create-team">Create Team</a>
                 </div>
+                <div class="btns-double-row">
+                  <a class="btn-darken menu-option btn-duel-option" id="btn-join-duel" data-l10n="index-join-duel">Join Duel</a>
+                  <a class="btn-darken menu-option btn-duel-option" id="btn-create-duel" data-l10n="index-create-duel">Create Duel</a>
+                </div>
                 <div id="btn-help" class="menu-option btn-darken" data-l10n="index-how-to-play">How to Play</div>
                 <div id="start-help">
                   <h1 data-l10n="index-controls">Controls</h1>
@@ -913,13 +917,17 @@
                         <optgroup id="team-server-opts" label="Region">
                         </optgroup>
                       </select>
-                      <div class="team-menu-options-buttons">
+                      <div class="team-menu-options-buttons" id="team-mode-row">
                         <a class="btn-hollow btn-hollow-selected btn-darken team-menu-option btn-team-queue" id="btn-team-queue-mode-1" data-l10n="index-duo">Duo</a>
                         <a class="btn-hollow btn-hollow-selected btn-darken team-menu-option btn-team-queue" id="btn-team-queue-mode-2" data-l10n="index-squad">Squad</a>
                       </div>
-                      <div class="team-menu-options-buttons">
+                      <div class="team-menu-options-buttons" id="team-fill-row">
                         <a class="btn-hollow btn-hollow-selected btn-darken team-menu-option btn-team-fill" id="btn-team-fill-auto" data-l10n="index-auto-fill">Auto Fill</a>
                         <a class="btn-hollow btn-darken team-menu-option btn-team-fill" id="btn-team-fill-none" data-l10n="index-no-fill">No Fill</a>
+                      </div>
+                      <div class="team-menu-options-buttons" id="team-duel-map-row" style="display: none;">
+                        <select id="team-duel-map-select" class="btn-hollow btn-hollow-selected server-select menu-option">
+                        </select>
                       </div>
                       <div id="team-menu-options-start">
                         <a class="btn-green btn-darken menu-option" id="btn-start-team" data-label="Play" data-l10n="index-play">Play</a>

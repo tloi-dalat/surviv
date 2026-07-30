@@ -52,6 +52,7 @@ class GameServer {
             autoFill: body.autoFill,
             mapName: body.mapName,
             teamMode: body.teamMode,
+            duelMode: body.duelMode,
             playerData: body.playerData,
         });
 

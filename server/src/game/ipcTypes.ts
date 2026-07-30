@@ -5,6 +5,7 @@ export interface GameData {
     id: string;
     teamMode: TeamMode;
     mapName: string;
+    duelMode: boolean;
     canJoin: boolean;
     aliveCount: number;
     startedTime: number;

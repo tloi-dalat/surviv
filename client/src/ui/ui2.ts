@@ -594,6 +594,7 @@ export class UiManager2 {
         lootBarn: LootBarn,
         map: Map,
         inputBinds: InputBinds,
+        maxHealth: number = GameConfig.player.health,
     ) {
         const state = this.newState;
 
@@ -666,9 +667,11 @@ export class UiManager2 {
         }
 
         // Player status
+        // state.health is a 0-100 percentage (used directly as a CSS width%
+        // below), so normalize the absolute HP value against the real max
         state.health = activePlayer.m_netData.m_dead
             ? 0
-            : math.max(activePlayer.m_localData.m_health, 1);
+            : math.max((activePlayer.m_localData.m_health / maxHealth) * 100, 1);
         state.boost = activePlayer.m_localData.m_boost;
         state.downed = activePlayer.m_netData.m_downed;
 

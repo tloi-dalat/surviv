@@ -1,4 +1,4 @@
-import { TeamMode } from "../../../shared/gameConfig.ts";
+import { GameConfig, TeamMode } from "../../../shared/gameConfig.ts";
 import type { Loadout } from "../../../shared/utils/loadout.ts";
 import { math } from "../../../shared/utils/math.ts";
 import { Config } from "../config.ts";
@@ -50,6 +50,7 @@ export class Game {
     teamMode: TeamMode;
     mapName: string;
     isTeamMode: boolean;
+    duelMode: boolean;
     config: ServerGameConfig;
     modeManager: GameModeManager;
 
@@ -105,6 +106,7 @@ export class Game {
         this.teamMode = config.teamMode;
         this.mapName = config.mapName;
         this.isTeamMode = this.teamMode !== TeamMode.Solo;
+        this.duelMode = !!config.duelMode;
 
         this.map = new GameMap(this);
         this.grid = new Grid(this.map.width, this.map.height);
@@ -327,11 +329,10 @@ export class Game {
     }
 
     get canJoin(): boolean {
-        return (
-            this.aliveCount < this.map.mapDef.gameMode.maxPlayers
-            && !this.over
-            && this.startedTime < 60
-        );
+        const maxPlayers = this.duelMode
+            ? GameConfig.duel.maxPlayers
+            : this.map.mapDef.gameMode.maxPlayers;
+        return this.aliveCount < maxPlayers && !this.over && this.startedTime < 60;
     }
 
     checkGameOver() {

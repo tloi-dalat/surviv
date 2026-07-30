@@ -68,3 +68,6 @@ Temporary Items
 *.vsix
 
 todo.md
+
+# custom
+.claude/

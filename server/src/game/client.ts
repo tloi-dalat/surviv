@@ -419,6 +419,7 @@ export class Client {
             joinedMsg.playerId = this.player?.__id ?? 0;
             joinedMsg.started = game.started;
             joinedMsg.teamMode = game.teamMode;
+            joinedMsg.duelMode = game.duelMode;
             if (this.player) {
                 joinedMsg.emotes = this.player.loadout.emotes;
             }
@@ -437,6 +438,7 @@ export class Client {
 
         const updateMsg = new net.UpdateMsg();
         updateMsg.ack = this.ack;
+        updateMsg.maxHealth = game.duelMode ? GameConfig.duel.maxHealth : GameConfig.player.health;
 
         if (game.gas.dirty || this._firstUpdate) {
             updateMsg.gasDirty = true;

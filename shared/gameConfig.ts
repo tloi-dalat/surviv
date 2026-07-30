@@ -141,7 +141,7 @@ export const GameConfig = {
     // the protocol we originated from was 78
     // remember to bump this every time a serialization function is changed
     // or a definition item added, removed or moved
-    protocolVersion: 1023,
+    protocolVersion: 1024,
     Action,
     Anim,
     DamageType,
@@ -424,6 +424,34 @@ export const GameConfig = {
         "4xscope": [1, 1, 1, 1],
         "8xscope": [1, 1, 1, 1],
         "15xscope": [1, 1, 1, 1],
+    },
+    duel: {
+        maxPlayers: 2,
+        maxHealth: 1000,
+        lootRerolls: 10,
+        // duel maps are generated at this percent of the normal solo map's
+        // width/height (e.g. 50 = half width and height, ~25% of the area),
+        // since a map sized for dozens of players is unnecessary for 2
+        mapScalePercent: 70,
+        maps: [
+            "main",
+            "main_spring",
+            "main_summer",
+            "desert",
+            "halloween",
+            "potato",
+            "potato_spring",
+            "snow",
+            "woods",
+            "woods_snow",
+            "woods_spring",
+            "woods_summer",
+            "savannah",
+            "cobalt",
+            "turkey",
+            "birthday",
+            "beach",
+        ] as const,
     },
     lootRadius: {
         outfit: 1,

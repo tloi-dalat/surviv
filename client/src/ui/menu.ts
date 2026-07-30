@@ -4,6 +4,10 @@ import { helpers } from "../helpers.ts";
 import type { InputBinds, InputBindUi } from "../inputBinds.ts";
 import { MenuModal } from "./menuModal.ts";
 
+// tracks whether the open code-entry panel was opened via "Join Duel" or
+// "Join Team", so the eventual join request carries the right intent
+export const joinIntent = { duel: false };
+
 function createToast(
     text: string,
     container: JQuery<HTMLElement>,
@@ -57,8 +61,10 @@ function setupModals(inputBinds: InputBinds, inputBindUi: InputBindUi) {
     const socialShareBlock = $("#social-share-block");
     const newsBlock = $("#news-block");
 
-    // Team mobile link
-    $("#btn-join-team").on("click", () => {
+    // Team/Duel mobile link (shared code-entry panel; joinIntent.duel
+    // records which button opened it so the join request can't be mixed
+    // between team codes and duel codes)
+    const openJoinPanel = () => {
         $("#server-warning").css("display", "none");
         teamMobileLinkInput.val("");
         teamMobileLink.css("display", "block");
@@ -69,6 +75,14 @@ function setupModals(inputBinds: InputBinds, inputBindUi: InputBindUi) {
         socialShareBlock.css("display", "none");
         $("#right-column").css("display", "none");
         return false;
+    };
+    $("#btn-join-team").on("click", () => {
+        joinIntent.duel = false;
+        return openJoinPanel();
+    });
+    $("#btn-join-duel").on("click", () => {
+        joinIntent.duel = true;
+        return openJoinPanel();
     });
     $("#btn-team-mobile-link-leave").on("click", () => {
         teamMobileLink.css("display", "none");

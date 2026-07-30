@@ -62,6 +62,7 @@ export interface Ctx {
 export class Game {
     initialized = false;
     teamMode: TeamMode = TeamMode.Solo;
+    duelMode = false;
 
     victoryMusic: SoundHandle | null = null;
     m_ws: WebSocket | null = null;
@@ -893,6 +894,7 @@ export class Game {
             this.m_lootBarn,
             this.m_map,
             this.m_inputBinds,
+            this.duelMode ? GameConfig.duel.maxHealth : GameConfig.player.health,
         );
         this.m_emoteBarn.m_update(
             dt,
@@ -1244,6 +1246,7 @@ export class Game {
                 msg.deserialize(stream);
                 this.onJoin();
                 this.teamMode = msg.teamMode;
+                this.duelMode = msg.duelMode;
                 this.m_localId = msg.playerId;
                 this.m_validateAlpha = true;
                 this.m_emoteBarn.updateEmoteWheel(msg.emotes);
@@ -1307,6 +1310,7 @@ export class Game {
             }
             case net.MsgType.Update: {
                 const msg = new net.UpdateMsg();
+                msg.maxHealth = this.duelMode ? GameConfig.duel.maxHealth : GameConfig.player.health;
                 msg.deserialize(stream, this.m_objectCreator);
                 this.m_playing = true;
                 this.m_processGameUpdate(msg);

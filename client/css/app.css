@@ -495,11 +495,14 @@ a:active {
 #start-menu {
   padding: 20px;
   width: 300px;
+  /* height grows with however many button rows are in the menu, rather
+     than a fixed value that clips new rows */
+  height: auto;
+  max-height: none;
 }
 
 @media (max-width: 850px), (max-width: 900px) and (min-resolution: 3dppx) {
   #start-menu {
-    height: 216px;
     padding: 10px;
     width: 210px;
   }
@@ -1182,6 +1185,22 @@ a:active {
   }
 }
 
+.btn-duel-option {
+  background: #af5050;
+  border-bottom: 2px solid #7a3838;
+  box-shadow: inset 0 -2px #7a3838;
+  color: #fff;
+  cursor: pointer;
+  position: relative;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+@media (max-width: 850px), (max-width: 900px) and (min-resolution: 3dppx) {
+  .btn-duel-option {
+    border-bottom: none;
+  }
+}
+
 #btn-team-leave {
   background: #7a7a7a;
   border-bottom: 2px solid #3e3e3e;
@@ -1223,21 +1242,24 @@ a:active {
 
 #team-menu {
   display: none;
-  height: 325px;
   padding: 12px;
   position: relative;
   width: 625px;
+  /* height grows with whatever rows the current room type shows
+     (team vs duel) instead of a fixed value tuned for one layout */
+  height: auto;
+  max-height: none;
 }
 
 @media (max-width: 850px), (max-width: 900px) and (min-resolution: 3dppx) {
   #team-menu {
-    height: 230px;
     width: 418px;
   }
 }
 
 #team-menu-columns {
-  height: 225px;
+  display: flex;
+  align-items: flex-start;
 }
 
 @media (max-width: 850px), (max-width: 900px) and (min-resolution: 3dppx) {
@@ -1276,9 +1298,9 @@ a:active {
 }
 
 #team-menu-members {
-  float: left;
   padding: 12px 0;
   width: 320px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 850px), (max-width: 900px) and (min-resolution: 3dppx) {
@@ -1515,14 +1537,14 @@ a:active {
 }
 
 #team-menu-options {
-  float: right;
   width: 280px;
   padding: 12px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 @media (max-width: 850px), (max-width: 900px) and (min-resolution: 3dppx) {
   #team-menu-options {
-    float: right;
     padding: 12px 0;
     width: 170px;
   }
@@ -6939,6 +6961,11 @@ input [type="image"]:focus {
     top: 48px;
     left: 50%;
     transform: translateX(-50%);
+  }
+
+  /* narrow enough that members/options can't sit side by side anymore */
+  #team-menu-columns {
+    flex-direction: column;
   }
 
   #team-desc {

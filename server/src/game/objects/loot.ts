@@ -211,6 +211,20 @@ export class LootBarn {
     }
 
     getLootTable(tier: string): LootTierItem | undefined {
+        if (this.game.duelMode) {
+            let best: LootTierItem | undefined;
+            for (let i = 0; i < GameConfig.duel.lootRerolls; i++) {
+                const roll = this._resolveLootTable(tier);
+                if (roll && (!best || roll.weight < best.weight)) {
+                    best = roll;
+                }
+            }
+            return best;
+        }
+        return this._resolveLootTable(tier);
+    }
+
+    private _resolveLootTable(tier: string): LootTierItem | undefined {
         assert(
             this.game.map.mapDef.lootTable[tier],
             `Unknown loot tier with type ${tier}`,
@@ -223,7 +237,7 @@ export class LootBarn {
         }
 
         if (item.name.startsWith("tier_")) {
-            item = this.getLootTable(item.name);
+            item = this._resolveLootTable(item.name);
         }
 
         return item;

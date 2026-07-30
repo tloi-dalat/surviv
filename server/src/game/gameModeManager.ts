@@ -142,6 +142,12 @@ export class GameModeManager {
     }
 
     isGameStarted(): boolean {
+        // duel matchmaking already guarantees exactly 2 known players queued
+        // in together, so there's no "wasted lobby" risk - skip the despawn
+        // grace period (used for public matches) and start immediately
+        if (this.game.duelMode) {
+            return this.aliveCount() > 1;
+        }
         return this.cantDespawnAliveCount() > 1;
     }
 
