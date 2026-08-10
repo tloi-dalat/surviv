@@ -101,6 +101,7 @@ export enum MapId {
     Cobalt = 7,
     Birthday = 8,
     Beach = 9,
+    Vietnam = 10,
 }
 
 export enum Plane {
@@ -141,7 +142,7 @@ export const GameConfig = {
     // the protocol we originated from was 78
     // remember to bump this every time a serialization function is changed
     // or a definition item added, removed or moved
-    protocolVersion: 1024,
+    protocolVersion: 1025,
     Action,
     Anim,
     DamageType,
@@ -427,9 +428,9 @@ export const GameConfig = {
     },
     duel: {
         maxPlayers: 2,
-        maxHealth: 200,
+        maxHealth: 1000,
         lootRerolls: 10,
-        mapScalePercent: 70,
+        mapScalePercent: 50,
         maps: [
             "main",
             "main_spring",
@@ -448,6 +449,7 @@ export const GameConfig = {
             "turkey",
             "birthday",
             "beach",
+            "vietnam",
         ] as const,
     },
     lootRadius: {

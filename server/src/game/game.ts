@@ -4,6 +4,7 @@ import { math } from "../../../shared/utils/math.ts";
 import { Config } from "../config.ts";
 import { ServerLogger } from "../utils/logger.ts";
 import { type FindGamePrivateBody, type ServerGameConfig } from "../utils/types.ts";
+import { AiBarn } from "./ai/aiBarn.ts";
 import { ClientBarn } from "./client.ts";
 import { GameModeManager } from "./gameModeManager.ts";
 import { Grid } from "./grid.ts";
@@ -67,8 +68,12 @@ export class Game {
 
     joinTokens = new Map<string, JoinTokenData>();
 
+    /**
+     * Drives the "players alive" HUD counter, so Vietnam-mode AI must not be
+     * included or the display would be wildly wrong.
+     */
     get aliveCount(): number {
-        return this.playerBarn.livingPlayers.length;
+        return this.playerBarn.livingPlayers.reduce((n, p) => n + (p.isAI ? 0 : 1), 0);
     }
 
     grid: Grid<GameObject>;
@@ -78,6 +83,8 @@ export class Game {
 
     clientBarn: ClientBarn;
     playerBarn: PlayerBarn;
+    /** Vietnam-mode jungle AI. Inert on every other map. */
+    aiBarn: AiBarn;
     lootBarn: LootBarn;
     deadBodyBarn: DeadBodyBarn;
     decalBarn: DecalBarn;
@@ -114,6 +121,7 @@ export class Game {
 
         this.clientBarn = new ClientBarn(this);
         this.playerBarn = new PlayerBarn(this);
+        this.aiBarn = new AiBarn(this);
         this.lootBarn = new LootBarn(this);
         this.deadBodyBarn = new DeadBodyBarn(this);
         this.decalBarn = new DecalBarn(this);
@@ -170,9 +178,15 @@ export class Game {
             this.started = this.modeManager.isGameStarted();
             if (this.started) {
                 this.gas.advanceGasStage();
+                // Seed the ambushes players walk into while looting. Done at
+                // start rather than at map gen so they aren't culled or drifting
+                // during an empty lobby.
+                this.aiBarn.seedInitialAi();
             } else {
+                // AI are never "disconnected", so they must be excluded here or
+                // a lobby full of trees would never hit the force-stop timer.
                 const connected = this.playerBarn.players.reduce((a, b) => {
-                    return a + (b.disconnected ? 0 : 1);
+                    return a + (b.disconnected || b.isAI ? 0 : 1);
                 }, 0);
                 if (connected === 0) {
                     this.noPlayersTicker += dt;
@@ -196,6 +210,12 @@ export class Game {
         //
         this.profiler.addSample("gas");
         this.gas.update(dt);
+        this.profiler.endSample();
+
+        // Must run before playerBarn: the controllers write the same input
+        // fields an InputMsg would, and player.update consumes them this tick.
+        this.profiler.addSample("ai");
+        this.aiBarn.update(dt);
         this.profiler.endSample();
 
         this.profiler.addSample("players");

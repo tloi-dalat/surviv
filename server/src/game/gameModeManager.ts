@@ -33,10 +33,20 @@ export class GameModeManager {
         this.isSolo = this.mode === GameMode.Solo;
     }
 
+    /**
+     * Vietnam-mode AI live in `livingPlayers` like everyone else, so every
+     * count that decides ranking or when the match ends has to exclude them.
+     * Miss one of these and a match never ends, because twenty trees are
+     * technically still alive.
+     */
+    private _livingHumans(): Player[] {
+        return this.game.playerBarn.livingPlayers.filter((p) => !p.isAI);
+    }
+
     aliveCount(): number {
         switch (this.mode) {
             case GameMode.Solo:
-                return this.game.playerBarn.livingPlayers.length;
+                return this._livingHumans().length;
             case GameMode.Team:
                 return this.game.playerBarn.getAliveGroups().length;
             case GameMode.Faction:
@@ -49,8 +59,7 @@ export class GameModeManager {
     cantDespawnAliveCount(): number {
         switch (this.mode) {
             case GameMode.Solo:
-                return this.game.playerBarn.livingPlayers.filter((p) => !p.canDespawn())
-                    .length;
+                return this._livingHumans().filter((p) => !p.canDespawn()).length;
             case GameMode.Team:
                 return this.game.playerBarn.getAliveGroups().filter((group) => {
                     return group.players.filter((p) => !p.canDespawn()).length > 0;
@@ -64,7 +73,7 @@ export class GameModeManager {
 
     // used when saving the game match data
     getPlayersSortedByRank(): Array<{ player: Player; rank: number }> {
-        const players = [...this.game.playerBarn.players];
+        const players = this.game.playerBarn.players.filter((p) => !p.isAI);
 
         switch (this.mode) {
             case GameMode.Solo: {
@@ -118,8 +127,8 @@ export class GameModeManager {
     sendGameOverMsgs() {
         switch (this.mode) {
             case GameMode.Solo: {
-                const winner = this.game.playerBarn.livingPlayers[0];
-                winner.addGameOverMsg(winner.teamId);
+                const winner = this._livingHumans()[0];
+                if (winner) winner.addGameOverMsg(winner.teamId);
                 break;
             }
             case GameMode.Team: {
@@ -236,7 +245,9 @@ export class GameModeManager {
             case GameMode.Solo:
                 return false;
             case GameMode.Team:
-                return !player.group!.allDeadOrDisconnected && this.aliveCount() > 1;
+                // group is optional purely because AI don't have one; belt and
+                // braces alongside them being excluded from the gameover queue.
+                return !player.group?.allDeadOrDisconnected && this.aliveCount() > 1;
             case GameMode.Faction:
                 return this.aliveCount() > 1;
         }
@@ -271,6 +282,15 @@ export class GameModeManager {
     }
 
     handlePlayerDeath(player: Player, params: DamageParams): void {
+        // Vietnam-mode AI have no group, so the team-mode branch below — which
+        // dereferences player.group to arbitrate downs and revives — throws on
+        // them and takes the whole tick with it. They also have no teammates to
+        // be revived by, so being "downed" is meaningless: they just die.
+        if (player.isAI) {
+            player.kill(params);
+            return;
+        }
+
         if (this.isSolo) {
             player.kill(params);
         } else {

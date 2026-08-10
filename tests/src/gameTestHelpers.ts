@@ -3,7 +3,7 @@ import { Game } from "../../server/src/game/game.ts";
 import type { MapDefKey } from "../../shared/defs/mapDefs.ts";
 import type { TeamMode } from "../../shared/gameConfig.ts";
 
-export function createGame(teamMode: TeamMode, mapName: MapDefKey) {
+export function createGame(teamMode: TeamMode, mapName: MapDefKey, duelMode = false) {
     // we dont want vitest spammed with stdout logs so only log warns and errors
     Config.logging.logDate = false;
     Config.logging.debugLogs = false;
@@ -11,6 +11,6 @@ export function createGame(teamMode: TeamMode, mapName: MapDefKey) {
     Config.logging.warnLogs = true;
     Config.logging.errorLogs = true;
 
-    const game = new Game("test", { mapName, teamMode });
+    const game = new Game("test", { mapName, teamMode, duelMode });
     return game;
 }

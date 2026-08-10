@@ -69,6 +69,23 @@ export function getConfig(isProduction: boolean, dir: string) {
             allowMockAccount: isDev,
         },
         defaultItems: {},
+        vietnam: {
+            enabled: true,
+            // Trees hit noticeably softer than a player with the same gun —
+            // you are fighting a lot of them, and they get to shoot first.
+            damageMult: 0.1,
+            seedDensity: 40,
+            maxAlive: 20,
+            baseAlive: 4,
+            perPlayerAlive: 1.2,
+            spawnIntervalMin: 6,
+            spawnIntervalMax: 14,
+            doorCooldown: 2.5,
+            reactionDelayMult: 1,
+            gasFleeMargin: 8,
+            throwableCount: 3,
+            throwCooldown: 6,
+        },
     };
 
     const dirname = import.meta?.dirname || __dirname;

@@ -1,4 +1,9 @@
 import { type GameObjectDef, type LootDef, WeaponTypeToDefs } from "../../../../shared/defs/gameObjectDefs.ts";
+import {
+    type AiArchetype,
+    getAiDef,
+    isAiArchetype,
+} from "../../../../shared/defs/gameObjects/aiDefs.ts";
 import { EmotesDefs } from "../../../../shared/defs/gameObjects/emoteDefs.ts";
 import {
     type BackpackDef,
@@ -41,6 +46,7 @@ import { InventoryManager } from "../inventoryManager.ts";
 import { QuestManager } from "../questManager.ts";
 import { NoOpSocket } from "../socket.ts";
 import { WeaponManager } from "../weaponManager.ts";
+import type { AiController } from "../ai/aiController.ts";
 import type { Building } from "./building.ts";
 import { BaseGameObject, type DamageParams, type GameObject } from "./gameObject.ts";
 import type { Loot } from "./loot.ts";
@@ -272,6 +278,61 @@ export class PlayerBarn {
         client.player = player;
 
         this.activatePlayer(player, group, team);
+
+        return player;
+    }
+
+    /**
+     * Hand an AI's group id back to the allocator.
+     *
+     * Solo-style players each own a group id, the pool is only 255 wide, and it
+     * is never replenished — which is fine when players spawn once per match.
+     * Vietnam-mode AI spawn and die continuously, so without recycling a long
+     * match exhausts the pool and dies with "Ran out of ID's".
+     */
+    releaseAiGroupId(player: Player) {
+        if (!player.isAI) return;
+        if (player.group || player.team) return;
+        if (player.groupId <= 0) return;
+
+        this.groupIdAllocator.give(player.groupId);
+        // zeroed so a double release can't hand the same id out twice
+        player.groupId = 0;
+    }
+
+    /**
+     * Spawn a headless AI player for Vietnam mode.
+     *
+     * Uses the same NoOpSocket path as {@link addTestPlayer}: the result is a
+     * real Player in every respect, it just has no socket behind it and is
+     * driven by an AiController rather than by InputMsgs. That is what lets the
+     * disguise, weapons, damage, loot and client serialisation all be the
+     * game's existing code rather than a parallel implementation.
+     *
+     * It is given its own group and team, so it is hostile to everyone and
+     * nobody is hostile to it by association.
+     */
+    addAiPlayer(archetype: string, pos: Vec2, layer = 0): Player | undefined {
+        if (!isAiArchetype(archetype)) return undefined;
+        const def = getAiDef(archetype as AiArchetype);
+
+        const client = new Client(this.game, new NoOpSocket(), null, "");
+        client.isHeadless = true;
+        this.game.clientBarn.clients.push(client);
+
+        const player = new Player(
+            this.game,
+            v2.copy(pos),
+            layer,
+            client,
+            def.displayName,
+            false,
+            false,
+        );
+        player.isAI = true;
+        client.player = player;
+
+        this.activatePlayer(player);
 
         return player;
     }
@@ -534,7 +595,8 @@ export class PlayerBarn {
 
     getPlayerWithHighestKills(): Player | undefined {
         return this.game.playerBarn.livingPlayers
-            .filter((p) => p.kills >= GameConfig.player.killLeaderMinKills)
+            // AI can rack up kills but must never hold the kill leader title
+            .filter((p) => !p.isAI && p.kills >= GameConfig.player.killLeaderMinKills)
             .sort((a, b) => b.kills - a.kills)[0];
     }
 
@@ -616,8 +678,13 @@ export class Player extends BaseGameObject {
 
     setGroupStatuses() {
         if (!this.game.isTeamMode) return;
+        // Vietnam-mode AI are deliberately group-less: they're hostile to
+        // everyone, and putting them in real groups would make them count toward
+        // getAliveGroups() and stop duo/squad matches from ever ending. They
+        // have no teammates to notify, so there is nothing to do here.
+        if (!this.group) return;
 
-        const teammates = this.group!.players;
+        const teammates = this.group.players;
         for (const t of teammates) {
             t.groupStatusDirty = true;
         }
@@ -632,7 +699,15 @@ export class Player extends BaseGameObject {
         ? GameConfig.duel.maxHealth
         : GameConfig.player.health;
 
+    /**
+     * Vietnam-mode AI take their max health from their archetype def rather than
+     * the global player constant. Assigned by AiBarn.spawn before `health` is
+     * set, so the health setter's clamp already sees the right ceiling.
+     */
+    aiMaxHealth?: number;
+
     get maxHealth(): number {
+        if (this.aiMaxHealth !== undefined) return this.aiMaxHealth;
         return this.game.duelMode ? GameConfig.duel.maxHealth : GameConfig.player.health;
     }
 
@@ -1329,6 +1404,20 @@ export class Player extends BaseGameObject {
      * which can break the matchData
      */
     matchDataId: number;
+
+    /**
+     * True for Vietnam-mode jungle AI. These are ordinary Players driven by an
+     * {@link AiController} instead of an InputMsg, so they must be filtered out
+     * of anything that counts, ranks or rewards real players.
+     */
+    isAI = false;
+    aiController?: AiController;
+    /**
+     * Multiplier the AI controller applies on top of the normally computed move
+     * speed. 0 roots an archetype in place; the rustle telegraph briefly raises
+     * it so even rooted enemies visibly shudder before they fire.
+     */
+    aiSpeedMult = 1;
 
     constructor(
         game: Game,
@@ -2454,6 +2543,21 @@ export class Player extends BaseGameObject {
             }
         }
 
+        // Jungle AI hit softer than a player would with the same weapon: you
+        // face a lot of them, they get to shoot first, and the mode is meant to
+        // be tense rather than a damage race. Tunable via Config.vietnam.
+        //
+        // This has to happen before the lethal-damage cap below, not after.
+        // Scaling a killing blow down *after* it had already been capped to
+        // "exactly this.health" turned every kill into a survive: a hit sized
+        // to zero you out got shrunk to a fraction of your remaining health
+        // instead, over and over, so health approached zero without ever
+        // reaching it — which reads as a permanent 1 HP floor, not as damage
+        // reduction.
+        if (playerSource?.isAI && !this.isAI) {
+            finalDamage *= Config.vietnam.damageMult;
+        }
+
         if (this._health - finalDamage < 0) {
             if (this.hasPerk("lifeline")) {
                 // Checks to see if the perk can mitigate the damage
@@ -2476,7 +2580,9 @@ export class Player extends BaseGameObject {
 
         this.damageTaken += finalDamage;
         if (playerSource && params.source !== this) {
-            if (playerSource.groupId !== this.groupId) {
+            // Damage dealt to jungle AI is deliberately not credited: shooting
+            // scenery shouldn't inflate a player's match stats or quests.
+            if (playerSource.groupId !== this.groupId && !this.isAI) {
                 playerSource.damageDealt += finalDamage;
                 playerSource.questManager.trackEvent("damage", {
                     amount: finalDamage,
@@ -2487,6 +2593,15 @@ export class Player extends BaseGameObject {
         }
 
         this.health -= finalDamage;
+
+        // Vietnam mode: being shot wakes a dormant AI immediately (a full rustle
+        // telegraph would be a free hit for a player who already found it), and
+        // damage taken by a real player is the director's main pacing signal.
+        if (this.isAI) {
+            this.aiController?.onDamaged(playerSource);
+        } else if (finalDamage > 0) {
+            this.game.aiBarn.director?.onPlayerDamaged(this, finalDamage);
+        }
 
         if (this.game.isTeamMode) {
             this.setGroupStatuses();
@@ -2623,7 +2738,12 @@ export class Player extends BaseGameObject {
 
         util.removeFrom(this.game.playerBarn.livingPlayers, this);
 
-        this.game.playerBarn.killedPlayers.push(this);
+        // AI have no client to receive a game-over message, and no group for the
+        // team-mode stats path to inspect — queueing them here used to crash the
+        // tick the moment one died in a duo or squad match.
+        if (!this.isAI) {
+            this.game.playerBarn.killedPlayers.push(this);
+        }
 
         this.group?.checkPlayers();
 
@@ -2651,7 +2771,13 @@ export class Player extends BaseGameObject {
         if (killCreditSource?.__type === ObjectType.Player) {
             this.killedBy = killCreditSource;
 
-            if (killCreditSource !== this && killCreditSource.teamId !== this.teamId) {
+            // Killing jungle AI is not a match kill. It shouldn't inflate the
+            // kill counter, the kill leader race, quests or saved stats — a tree
+            // is an obstacle that shoots back, not an opponent you beat.
+            if (
+                killCreditSource !== this && killCreditSource.teamId !== this.teamId
+                && !this.isAI
+            ) {
                 killCreditSource.killedIds.push(this.matchDataId);
                 killCreditSource.kills++;
                 killCreditSource.questManager.trackEvent("kill", {
@@ -2909,7 +3035,7 @@ export class Player extends BaseGameObject {
             });
         }
 
-        if (this.outfit) {
+        if (this.outfit && !this.isAI) {
             const def = GameObjectDefs.typeToDef(this.outfit, "outfit");
             if (!def.noDropOnDeath && !def.noDrop && this.outfit !== this.loadout.outfit) {
                 this.game.lootBarn.addLoot(this.outfit, this.pos, this.layer, 1, {
@@ -2936,6 +3062,16 @@ export class Player extends BaseGameObject {
         }
         this._perks.length = 0;
         this._perkTypes.length = 0;
+
+        // Vietnam mode: archetype bonus loot, the costume drop roll, and any
+        // death explosion. Runs after the normal gun/ammo drops so killing an
+        // AI is always worth the ammunition it cost.
+        if (this.isAI) {
+            const aiKiller = killCreditSource?.__type === ObjectType.Player
+                ? killCreditSource
+                : undefined;
+            this.game.aiBarn.onAiDeath(this, aiKiller);
+        }
 
         // Wipe inventory
         this.invManager.wipeInventory();
@@ -2992,6 +3128,9 @@ export class Player extends BaseGameObject {
     }
 
     canDespawn() {
+        // AI are removed by the director, never by the despawn timer
+        if (this.isAI) return false;
+
         // special check for 50v50
         // we dont want eg leaders to despawn a second after being promoted :p
         if (this.game.map.factionMode && this.role) return false;
@@ -4651,5 +4790,12 @@ export class Player extends BaseGameObject {
         }
 
         this.speed = math.clamp(this.speed, 1, 10000);
+
+        // Applied after the player clamp so an archetype with speedMult 0 is
+        // genuinely rooted, while still inheriting every terrain, water and
+        // weapon-weight modifier a real player would get.
+        if (this.isAI) {
+            this.speed = math.max(this.speed * this.aiSpeedMult, 0);
+        }
     }
 }

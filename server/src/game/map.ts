@@ -189,10 +189,19 @@ export class GameMap {
     mapDef: MapDef;
     mapId: MapId;
 
+    /**
+     * Area multiplier applied to absolute (fixedSpawns) object counts so a
+     * shrunken duel map keeps the density the map was designed around. 1 outside
+     * duels. densitySpawns already scale by area and are unaffected.
+     */
+    duelAreaScale = 1;
+
     factionMode: boolean;
     perkMode: boolean;
     turkeyMode: boolean;
     woodsMode: boolean;
+    /** Jungle map seeded with AI disguised as scenery. See server/src/game/ai/. */
+    vietnamMode: boolean;
     desertMode: boolean;
     potatoMode: boolean;
     sniperMode: boolean;
@@ -285,6 +294,13 @@ export class GameMap {
             const duelScale = GameConfig.duel.mapScalePercent / 100;
             width *= duelScale;
             height *= duelScale;
+            // Shrinking the map shrinks its area quadratically, and fixedSpawns
+            // counts are absolute rather than area-derived, so without this a
+            // duel map keeps every tree and building from a full-size map and
+            // ends up roughly 1/duelScale^2 times as cluttered. At 70% that is
+            // twice the density; at 50% it is four times, which on a forest map
+            // is a solid wall of trees. See genFixedSpawns.
+            this.duelAreaScale = duelScale * duelScale;
         }
 
         this.width = width;
@@ -298,6 +314,7 @@ export class GameMap {
         this.perkMode = !!this.mapDef.gameMode.perkMode;
         this.turkeyMode = !!this.mapDef.gameMode.turkeyMode;
         this.woodsMode = !!this.mapDef.gameMode.woodsMode;
+        this.vietnamMode = !!this.mapDef.gameMode.vietnamMode;
         this.desertMode = !!this.mapDef.gameMode.desertMode;
         this.potatoMode = !!this.mapDef.gameMode.potatoMode;
         this.sniperMode = !!this.mapDef.gameMode.sniperMode;
@@ -947,6 +964,12 @@ export class GameMap {
                     count = Math.random() < count.odds ? 1 : 0;
                 }
             }
+            // Keep at least one of anything the map def asked for, so landmark
+            // buildings survive the scaling even on a very small duel map.
+            if (this.duelAreaScale !== 1 && count > 0) {
+                count = Math.max(1, Math.round(count * this.duelAreaScale));
+            }
+
             const def = MapObjectDefs.typeToDef(type);
 
             if (def.terrain?.bridge || mapGen.importantSpawns.includes(type)) {
@@ -2022,8 +2045,16 @@ export class GameMap {
         }
 
         for (const patch of def.mapGroundPatches ?? []) {
+            // Ground patches are positioned relative to their building, so a
+            // building near the edge of a small map (a duel map, most often) can
+            // push a patch corner past the origin into negative coordinates.
+            // writeMapPos only encodes [0, mapSize], so that used to throw during
+            // map serialisation and abort the whole match. Clamping is visually
+            // free: the clipped part was off the map anyway.
+            const clamp = (p: Vec2) => coldet.clampPosToAabb(p, this.bounds);
+
             if (patch.bound.type === collider.Type.Circle) {
-                const worldCenter = math.addAdjust(pos, patch.bound.pos, ori);
+                const worldCenter = clamp(math.addAdjust(pos, patch.bound.pos, ori));
                 this.msg.groundPatches.push({
                     bound: collider.createCircle(worldCenter, patch.bound.rad),
                     color: patch.color,
@@ -2035,8 +2066,8 @@ export class GameMap {
             } else {
                 this.msg.groundPatches.push({
                     bound: collider.createAabb(
-                        math.addAdjust(pos, patch.bound.min, ori),
-                        math.addAdjust(pos, patch.bound.max, ori),
+                        clamp(math.addAdjust(pos, patch.bound.min, ori)),
+                        clamp(math.addAdjust(pos, patch.bound.max, ori)),
                     ),
                     color: patch.color,
                     roughness: patch.roughness ?? 0,

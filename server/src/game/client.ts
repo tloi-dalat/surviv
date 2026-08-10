@@ -34,13 +34,19 @@ export class ClientBarn {
 
     update(dt: number) {
         for (let i = 0; i < this.clients.length; i++) {
-            this.clients[i].update(dt);
+            const client = this.clients[i];
+            // Headless clients back AI players. Skipping them here avoids paying
+            // full visibility culling per AI, which is the difference between
+            // two dozen AI being free and being a double-digit CPU tax.
+            if (client.isHeadless) continue;
+            client.update(dt);
         }
     }
 
     sendMsgs() {
         for (let i = 0; i < this.clients.length; i++) {
             const client = this.clients[i];
+            if (client.isHeadless) continue;
             if (client.socket.closed()) continue;
             client.sendMsgs();
         }
@@ -256,6 +262,12 @@ export class Client {
     socket: ClientSocket<Client>;
 
     disconnected = false;
+
+    /**
+     * True for the dummy clients behind Vietnam-mode AI. There is no socket to
+     * serialise for, so both the per-tick update and the send are skipped.
+     */
+    isHeadless = false;
 
     userId: string | null = null;
     ip: string;

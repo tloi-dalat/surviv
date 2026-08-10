@@ -705,6 +705,10 @@ export class WeaponManager {
 
         this.player.shotSlowdownTimer = itemDef.fireDelay;
 
+        // Vietnam mode: gunfire is what wakes dormant AI, which is why "shoot
+        // the suspicious bush" costs more than the ammunition. No-op elsewhere.
+        this.player.game.aiBarn.onNoise(this.player.pos, this.player.layer);
+
         this.player.cancelAction();
 
         weapon.ammo--;

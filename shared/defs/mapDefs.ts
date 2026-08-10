@@ -1,5 +1,6 @@
 import type { MapId } from "../gameConfig.ts";
 import type { Vec2 } from "../utils/v2.ts";
+import type { AiModeConfig } from "./gameObjects/aiDefs.ts";
 import type { RoleDef } from "./gameObjects/roleDefs.ts";
 import { Main } from "./maps/baseDefs.ts";
 import { Beach } from "./maps/beachDefs.ts";
@@ -17,6 +18,7 @@ import { Savannah } from "./maps/savannahDefs.ts";
 import { Snow } from "./maps/snowDefs.ts";
 import { testFaction, testNormal } from "./maps/testDefs.ts";
 import { Turkey } from "./maps/turkeyDefs.ts";
+import { Vietnam } from "./maps/vietnamDefs.ts";
 import { Woods } from "./maps/woodsDefs.ts";
 import { WoodsSnow } from "./maps/woodsSnowDefs.ts";
 import { WoodsSpring } from "./maps/woodsSpringDefs.ts";
@@ -58,6 +60,7 @@ const _MapDefs = {
     turkey: Turkey,
     birthday: Birthday,
     beach: Beach,
+    vietnam: Vietnam,
 
     /* STRIP_FROM_PROD_CLIENT:START */
     test_normal: testNormal,
@@ -127,6 +130,14 @@ export interface MapDef {
         perkModeRoles?: string[];
         turkeyMode?: boolean;
         spookyKillSounds?: boolean;
+        /**
+         * "Vietnam" mode: the map is seeded with AI players wearing costume outfits
+         * so they render as scenery (trees, bushes, stumps). They wake up, stalk
+         * and shoot real players.
+         * See shared/defs/gameObjects/aiDefs.ts and server/src/game/ai/.
+         */
+        vietnamMode?: boolean;
+        ai?: AiModeConfig;
     };
     gameConfig: {
         planes: {

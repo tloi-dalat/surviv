@@ -370,6 +370,46 @@ export interface ConfigType {
      * Overrides default items players spawn with, mostly for development.
      * Account loadouts and mode spawn items (eg from cobalt) can still override this!
      */
+    /**
+     * Vietnam mode tuning. Everything here is safe to change in
+     * survev-config.hjson without touching code or rebuilding the client —
+     * the map def owns structural things (which costumes and melee exist,
+     * archetype mix), this owns the numbers you actually want to fiddle with.
+     */
+    vietnam: {
+        /** Master switch. Turning this off leaves the map but empties the jungle. */
+        enabled: boolean;
+        /**
+         * Multiplier on all damage dealt by jungle AI, guns and melee alike.
+         * 1 = the same damage a player would do with that weapon.
+         */
+        damageMult: number;
+        /** AI seeded across the map at match start, per 250,000 units of land. */
+        seedDensity: number;
+        /** Ceiling on director reinforcements alive at once (excludes the seeded population). */
+        maxAlive: number;
+        /** Reinforcement cap is min(maxAlive, baseAlive + perPlayerAlive * living players). */
+        baseAlive: number;
+        perPlayerAlive: number;
+        /** Seconds between reinforcement waves, before escalation scaling. */
+        spawnIntervalMin: number;
+        spawnIntervalMax: number;
+        /**
+         * Seconds an AI waits after using a door before it will touch one again.
+         * Without this they reopen a door the instant you close it, which reads
+         * as a bug rather than as an opponent.
+         */
+        doorCooldown: number;
+        /** Seconds of telegraph before a woken AI may fire. The main fairness knob. */
+        reactionDelayMult: number;
+        /** How far outside the safe zone an AI starts running for the circle. */
+        gasFleeMargin: number;
+        /** Throwables each AI spawns with. */
+        throwableCount: number;
+        /** Minimum seconds between an AI's throws. */
+        throwCooldown: number;
+    };
+
     defaultItems: {
         weapons?: [
             {
